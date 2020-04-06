@@ -1,0 +1,330 @@
+/////// Constants /////
+	public static final String URN_sendSmsEmail = URN_AI_COMMON_PATH + "/sendsmsemail";
+	public static final String URN_minPayment = URN_AI_COMMON_PATH + "/minPayment";
+///////////////////////
+//////// Contorller  ////////
+@RequestMapping(value = Constants.URN_minPayment , method = RequestMethod.POST)
+	public sendSmsEmailResponse minPay(HttpServletRequest request, HttpServletResponse response,@RequestBody String requestJson) {
+		ThreadContext.put("UUID", UUID.randomUUID().toString());
+		logger.info("Start SendSmsEmail"); 
+		sendSmsEmailResponse returnObj = new sendSmsEmailResponse();
+		try {
+			logger.info("Input MinPaymentServices : " + requestJson);
+			
+			CommonRequestObj requestObject = mapper.readValue(requestJson, CommonRequestObj.class);
+			returnObj = aiCommonService.sendSmsEmail(requestObject);
+			logger.info("Output MinPaymentServices : "+mapper.writeValueAsString(returnObj));
+			
+		}catch(Exception e) {
+			logger.error("Error : " + e.toString());
+			returnObj.setCode(Constants.RESP_INTERNAL_ERR_CODE());
+			returnObj.setMessage(Constants.RESP_INTERNAL_ERR_MSG());
+		}
+		
+		logger.info("End MinPaymentServices"); 
+		return returnObj;
+	}
+////////////////////////////
+///////// Services ////////
+public minPaymentResponseObj minPayment(CommonRequestObj requestObj) {
+		
+		minPaymentResponseObj meta = new minPaymentResponseObj();
+		AipromptDTO aiprompt = new AipromptDTO();
+		
+		invalidInputCause = "";
+		boolean validInput = true;
+		
+		if (StringUtils.isEmpty(requestObj.getCall_id())) {
+			validInput = false;
+			invalidInputCause += " call_id"; 	
+		}
+		if (StringUtils.isEmpty(requestObj.getAccount_no())) {
+			validInput = false;
+			invalidInputCause += " account_no"; 	
+		}
+		if (StringUtils.isEmpty(requestObj.getCardno())) {
+			validInput = false;
+			invalidInputCause += " cardno"; 	
+		}
+		if (StringUtils.isEmpty(requestObj.getIntention_id())) {
+			validInput = false;
+			invalidInputCause += " intention_id"; 	
+		}
+		if (StringUtils.isEmpty(requestObj.getDnis_no())) {
+			validInput = false;
+			invalidInputCause += " dnis_no"; 	
+		}
+		if (StringUtils.isEmpty(requestObj.getAni())) {
+			validInput = false;
+			invalidInputCause += " ani"; 	
+		}
+		
+
+		logger.info("valid Input:" + validInput + invalidInputCause);
+
+		if(validInput) {
+			
+		try {
+			logger.info("Start Call Get File Name");
+			aiprompt = aiPromptMgtDAO.getFileName();
+			logger.info("End Call Get File Name");
+			String fileName = "";
+			if(aiprompt != null) {
+				String productType = "";
+				String call_center_no = requestObj.getDnis_no();
+				String [] arrCard = requestObj.getCard_no().split(",");
+				String  product_typeCC = "";
+				String  product_type3in1 = "";
+				String  product_typePL = "";
+				logger.info("call_center_no : " + call_center_no);
+				logger.info("Size of CardNo:" + arrCard.length);
+				for (String card : arrCard) {
+					
+					logger.info("Start Call Find ProductType");
+					productType = mappingProduct(requestObj.getDnis_no() , card);
+					logger.info("End Call Find ProductType");
+					if(productType.equals("1")) {
+						product_typeCC = "CC";
+					}
+					
+					if(productType.equals("2")) {
+						product_type3in1 = "3in1";
+					}
+					
+					if(productType.equals("3")) {
+						product_typePL = "PL";
+					}
+				}
+				
+				String product_type = product_typeCC+product_type3in1+product_typePL;
+				logger.info("product_type : " + product_type);
+				if(product_type.equals("")) {
+					fileName = aiprompt.getPMT_FILENAME()+"_"+call_center_no+".wav";
+				}else {
+					fileName = aiprompt.getPMT_FILENAME()+"_"+call_center_no+"_"+product_type+".wav";
+				}
+				logger.info("FileName : " + fileName);
+				meta.setCode(Constants.RESP_SUCCESS_CODE());
+				meta.setMessage(Constants.RESP_SUCCESS_MSG());
+				meta.setPrompt_filename(fileName);
+				logger.info("Success Services");
+			}else {
+				logger.info("Errro Cause : Not Fount Data Of File Name");
+				meta.setCode(Constants.RESP_INTERNAL_ERR_CODE());
+				meta.setMessage(Constants.RESP_INTERNAL_ERR_MSG());
+			}
+			
+			
+		}catch (Exception e) {
+			logger.info("Errro Cause : "+e.toString());
+			meta.setCode(Constants.RESP_INTERNAL_ERR_CODE());
+			meta.setMessage(Constants.RESP_INTERNAL_ERR_MSG());
+		}
+			
+		}else {
+			logger.error("Input" + invalidInputCause + " Invalid!");
+			meta.setCode(Constants.RESP_ERROR_INPUT_CODE());
+			meta.setMessage(Constants.RESP_ERROR_INPUT_MSG() + " :" + invalidInputCause + " Invalid!");
+		}
+		
+		return meta;
+	}
+	
+	public String mappingProduct(String dnisNo , String cardNo) {
+		
+			String ProductType = null; 
+		try {
+			String url = null;
+			String requestParam = null;
+			Document doc = null;
+			NodeList accList = null;
+			NodeList cardList = null;
+			int totalAcc = 0;
+			int totalcard = 0;
+			String org = null ;
+			String logo = null;
+			
+			try {
+				
+				logger.info("Flow_name : List Cards");
+				// String COMN_CDI_API_SOAP_HOST_LIST_CARDS_URL =
+				// "http://cf1ts808.aycap.bayad.co.th:13080/cdi/services/customer/informations";
+				url = Constants.COMN_CDI_API_SOAP_HOST_LISTCARDS_URL();
+
+					requestParam = Constants.COMN_CDI_API_SOAP_HOST_LISTCARDS_PARAM_CARDNUMBER()
+							.replace("%{criteriaValue}%", cardNo);
+
+			logger.info("Start call CDI API");
+			
+			doc = WebServiceUtil.sendRequest(url, Constants.COMN_REQ_TIMEOUT(), requestParam, "get",
+					"application/xml", null, logger);
+
+			accList = doc.getElementsByTagName("accountLevel");
+			totalAcc = accList.getLength();
+
+			logger.info("total Acc Size:" + totalAcc);
+			if (totalAcc > 0) {
+
+				for (int i = 0; i < totalAcc; i++) {
+					Node node = accList.item(i);
+
+					String accNumber = WebServiceUtil.getTextValue(node, "accountNumber");
+
+					// cardList = doc.getElementsByTagName("cardLevel");
+					cardList = WebServiceUtil.getNodeList(node, "cardLevel");
+
+					totalcard = cardList.getLength();
+
+					logger.info("Start Mapping accountNumber[" + accNumber + "]");
+					logger.info("total Card Size:" + totalcard);
+					if (totalcard > 0) {
+
+						for (int j = 0; j < totalcard; j++) {
+							Node nodeCard = cardList.item(j);
+							
+							logo = WebServiceUtil.getTextValue(nodeCard, "logo");
+							org =WebServiceUtil.getTextValue(nodeCard, "org");
+
+						} // Loop Card
+						logger.debug("Success mapping Data from CDI to Arr");
+
+					} else {
+						logger.error("No Card Data from cdi Soap!");
+						logo = "";
+						org = "";
+					}
+
+				} // Loop Acc
+
+			} else {
+				logger.error("No Account Data from cdi Soap!");
+				logo = "";
+				org = "";
+			}
+				
+				} catch (Exception e) {
+					logger.error("Call CDI Catch");
+					logo = "";
+					org = "";
+				}
+			
+			logger.info("Org :" + org);
+			logger.info("Logo :" + logo);
+			
+			logger.info("Start search first_pvtFlag from <IVR> using dnis_number:[" + dnisNo + "]");
+			String first_pvtFlag = mappingProductCodeDAO.searchPvtFlag_ivr(dnisNo);
+			
+			
+			// [Mapping Product Code]
+			String productCode = "";
+			String productId = "";
+			String card_dnisNumber = "";
+			try {
+				MappingProductCodeDTO mapProduct = null;
+				
+					logger.info("Start Mapping Product Code from <IVR> -cardNumber:" + cardNo
+							+ " -org:" + org + " -logo:" + logo + " -dnisNo:" + dnisNo);
+					mapProduct = mappingProductCodeDAO.mapProduct_ivr(cardNo, 4, org, logo, dnisNo,
+							"");
+
+				if (mapProduct != null) {
+
+					MasterProductDTO masterProduct = null;
+					logger.info("Found Product on <IVR> mapping with productCode:"
+							+ mapProduct.getProductCode() + " ,mapProductId:"
+							+ mapProduct.getProductId() + " ,entityCode:" + mapProduct.getEntityCode()
+							+ " ,pvtFlag:" + mapProduct.getPvtFlag());
+
+					productCode = mapProduct.getProductCode();
+					productId = mapProduct.getProductId();
+					card_dnisNumber = dnisNo;
+
+					// Mapping Product Type
+					try {
+						logger.info("Start Mapping Product Type -product_Code:" + productCode);
+						ProductType = mappingProductType(productCode);
+						masterProduct = masterProductDAO.mapProduct_master(cardNo, 4, org, logo,
+								first_pvtFlag);
+						if (StringUtils.isEmpty(ProductType)) {
+							logger.error("card[" + cardNo
+									+ "] Mapping product type Error : productType is Empty");
+							ProductType = "N/A";
+						}
+
+					} catch (Exception e) {
+						logger.error("card[" + cardNo + "] Mapping product type Error :" + e.toString());
+						ProductType = "N/A";
+					}
+
+				} else {
+
+					logger.info("Product Not Found on <IVR>");
+					
+						logger.info("Product not Found either <IVR> or <MASTER_PRODUCT>");
+						productCode = "N/A";
+						productId = "N/A";
+						ProductType = "N/A";
+						card_dnisNumber = "N/A";
+
+					
+
+				}
+
+			} catch (Exception e) {
+				logger.error("card[" + cardNo + "] Mapping product code Error :" + e.toString());
+				ProductType = "N/A" ;
+			}
+		}catch (Exception e) {
+			logger.error("card[" + cardNo + "] Mapping Serach Pvt_First product code Error :" + e.toString());
+			ProductType = "N/A" ;
+		}
+		
+		
+		return ProductType;
+	}
+	
+
+///////////////////////////
+///////// Model  Request ////////
+	private String code;
+	private String message;
+	private String prompt_filename;
+	public String getCode() {
+		return code;
+	}
+	public void setCode(String code) {
+		this.code = code;
+	}
+	public String getMessage() {
+		return message;
+	}
+	public void setMessage(String message) {
+		this.message = message;
+	}
+	public String getPrompt_filename() {
+		return prompt_filename;
+	}
+	public void setPrompt_filename(String prompt_filename) {
+		this.prompt_filename = prompt_filename;
+	}
+	 
+	
+///////////////////////////////
+//////// DAO //////////    AiPromptMgtDAO
+public abstract AipromptDTO getFileName() throws Exception;  
+///////////////////////
+//////// DAOIMPL ///////  AiPromptMgtDAOImpl
+@Override
+	public AipromptDTO getFileName() throws Exception {
+		String sql = "SELECT PMT_FILENAME as FROM AI_PROMPT_MGT WHERE PMT_TYPE = 'CVMP' AND PMT_STATUS = 'Y'";
+		
+		List<AipromptDTO> prompt = (List<AipromptDTO>) sessionFactory.getCurrentSession()
+				.createSQLQuery(sql).addScalar("PMT_FILENAME").setResultTransformer(Transformers.aliasToBean(AipromptDTO.class)).list();
+		
+		if(prompt != null && prompt.size() > 0) {
+			return prompt.get(0);
+		}else {
+			return null;
+		}
+	}
+////////////////////////

@@ -1,0 +1,225 @@
+
+Request  CommonRequest
+
+private String call_id;
+	private String option;
+	private String account_no;
+	private String cardno;
+	private String intention_id;
+
+
+	public String getCall_id() {
+		return call_id;
+	}
+	public void setCall_id(String call_id) {
+		this.call_id = call_id;
+	}
+	public String getOption() {
+		return option;
+	}
+	public void setOption(String option) {
+		this.option = option;
+	}
+	public String getAccount_no() {
+		return account_no;
+	}
+	public void setAccount_no(String account_no) {
+		this.account_no = account_no;
+	}
+	public String getCardno() {
+		return cardno;
+	}
+	public void setCardno(String cardno) {
+		this.cardno = cardno;
+	}
+	public String getIntention_id() {
+		return intention_id;
+	}
+	public void setIntention_id(String intention_id) {
+		this.intention_id = intention_id;
+	}
+	
+///////////////////////////////////////////////
+
+Response
+
+public class sendSmsEmailResponse {
+
+	private String code;
+	private String message;
+	private String option;
+	private String status;
+	
+	public String getCode() {
+		return code;
+	}
+	public void setCode(String code) {
+		this.code = code;
+	}
+	public String getMessage() {
+		return message;
+	}
+	public void setMessage(String message) {
+		this.message = message;
+	}
+	public String getOption() {
+		return option;
+	}
+	public void setOption(String option) {
+		this.option = option;
+	}
+	public String getStatus() {
+		return status;
+	}
+	public void setStatus(String status) {
+		this.status = status;
+	}
+	
+	
+	
+}
+
+///////////////////////////////////
+
+Controller
+
+@RequestMapping(value = Constants.URN_sendSmsEmail , method = RequestMethod.POST)
+	public sendSmsEmailResponse sendSmsEmail(HttpServletRequest request, HttpServletResponse response,@RequestBody String requestJson) {
+		ThreadContext.put("UUID", UUID.randomUUID().toString());
+		logger.info("Start SendSmsEmail"); 
+		sendSmsEmailResponse returnObj = new sendSmsEmailResponse();
+		try {
+			logger.info("Input SendSmsEmailServices : " + requestJson);
+			
+			CommonRequestObj requestObject = mapper.readValue(requestJson, CommonRequestObj.class);
+			returnObj = aiCommonService.sendSmsEmail(requestObject);
+			logger.info("Output SendSmsEmailServices : "+mapper.writeValueAsString(returnObj));
+			
+		}catch(Exception e) {
+			logger.error("Error : " + e.toString());
+			returnObj.setCode(Constants.RESP_INTERNAL_ERR_CODE());
+			returnObj.setMessage(Constants.RESP_INTERNAL_ERR_MSG());
+		}
+		
+		logger.info("End SendSmsEmail"); 
+		return returnObj;
+	}
+
+/////////////////////////////
+Services
+
+@SuppressWarnings("unused")
+	public sendSmsEmailResponse sendSmsEmail(CommonRequestObj requestObj) {
+	
+		sendSmsEmailResponse meta = new sendSmsEmailResponse();
+		
+			invalidInputCause = "";
+			boolean validInput = true;
+			
+			if (StringUtils.isEmpty(requestObj.getCall_id())) {
+				validInput = false;
+				invalidInputCause += " call_id"; 	
+			}
+			if (StringUtils.isEmpty(requestObj.getOption())) {
+				validInput = false;
+				invalidInputCause += " option"; 	
+			}
+			if (StringUtils.isEmpty(requestObj.getAccount_no())) {
+				validInput = false;
+				invalidInputCause += " account_no"; 	
+			}
+			if (StringUtils.isEmpty(requestObj.getCardno())) {
+				validInput = false;
+				invalidInputCause += " cardno"; 	
+			}
+			if (StringUtils.isEmpty(requestObj.getIntention_id())) {
+				validInput = false;
+				invalidInputCause += " intention_id"; 	
+			}
+			if (StringUtils.isEmpty(requestObj.getDnis_no())) {
+				validInput = false;
+				invalidInputCause += " dnis_no"; 	
+			}
+			if (StringUtils.isEmpty(requestObj.getAni())) {
+				validInput = false;
+				invalidInputCause += " ani"; 	
+			}
+			
+
+			logger.info("valid Input:" + validInput + invalidInputCause);
+
+			if(validInput) {
+				try {
+					Object dataJoin = new Object();
+					String smsTemplate = ""; 
+					String emailTemplate = ""; 
+					boolean checkApi = false;
+					boolean byPass = false;
+					if(requestObj.getOption().equals("1")) {
+						logger.info("Start get Data for Send Email");
+						logger.info("End get Data for Send Email");
+						
+						emailTemplate = ""; // get From DB EMAILTEMPLATE
+					}else {
+						logger.info("Start get Data for Send Sms");
+						logger.info("End get Data for Send Sms");
+						
+						smsTemplate = ""; //  get From DB SMSTEMPLATE
+					}
+
+					if(dataJoin != null) {
+						
+						
+						if(emailTemplate.equals("")) {
+							// replace data for email template
+						}else {
+							// replace data for sms template
+						}
+						
+					}else {
+						meta.setCode(Constants.RESP_INTERNAL_ERR_CODE());
+						meta.setMessage(Constants.RESP_INTERNAL_ERR_MSG());
+						byPass = true;
+					}
+					
+					if(byPass) {
+						
+						if(requestObj.getOption().equals("1")) {
+							
+							// call Email
+							
+						}else {
+						
+							// call Sms
+							
+						}
+						
+						if(checkApi) {
+							meta.setCode(Constants.RESP_SUCCESS_CODE());
+							meta.setMessage(Constants.RESP_SUCCESS_MSG());
+							meta.setOption(requestObj.getOption());
+							meta.setStatus("Y");
+						}else {
+							meta.setCode(Constants.RESP_ERROR_HOST_CODE());
+							meta.setMessage(Constants.RESP_ERROR_HOST_MSG() );
+						}
+						
+					}
+					
+					}catch (Exception e) {
+						logger.info("Errro Cause : "+e.toString());
+						meta.setCode(Constants.RESP_INTERNAL_ERR_CODE());
+						meta.setMessage(Constants.RESP_INTERNAL_ERR_MSG());
+					}
+			}else {
+				logger.error("Input" + invalidInputCause + " Invalid!");
+				meta.setCode(Constants.RESP_ERROR_INPUT_CODE());
+				meta.setMessage(Constants.RESP_ERROR_INPUT_MSG() + " :" + invalidInputCause + " Invalid!");
+			}
+		
+		return meta;
+	}
+
+//////////////////////////////////////////////////
+
+
